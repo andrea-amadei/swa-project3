@@ -1,0 +1,36 @@
+@import "../constants";
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  width: 800px;
+  gap: 15px;
+
+  border-radius: 10px;
+  padding: 20px;
+  border-width: 2px;
+  border-style: solid;
+
+  cursor: pointer;
+
+  &:not(:hover) {
+    border-color: transparent;
+  }
+
+  &:hover {
+    border-color: $primary-color;
+  }
+
+  pre {
+    font-family: inherit;
+  }
+
+  .details {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+
+    font-size: 0.8em;
+    color: transparentize($primary-color, 0.2);
+  }
+}

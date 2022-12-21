@@ -1,0 +1,17 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: messaging-db
+spec:
+  instances: 1
+
+  bootstrap:
+    initdb:
+      database: messaging
+      owner: messaging
+      postInitApplicationSQLRefs:
+        configMapRefs:
+        - name: config
+          key: init.sql
+  storage:
+    size: 1Gi

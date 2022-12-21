@@ -1,0 +1,71 @@
+@import "../constants";
+
+.new-card {
+  position: relative;
+
+  textarea {
+    background-color: $medium-background-color;
+    color: $primary-color;
+    width: 100%;
+
+    outline: none;
+
+    resize: none;
+
+    font-size: 1em;
+    font-family: "Fira code", "Fira Mono", monospace;
+
+    border-radius: 10px;
+    padding: 60px 20px 20px;
+    border-width: 2px;
+    border-style: solid;
+
+    overflow: hidden;
+
+    &:not(:hover) {
+      border-color: transparent;
+    }
+
+    &:hover {
+      border-color: $primary-color;
+    }
+  }
+
+  .new-thread-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 10px 10px 10px 20px;
+    width: 100%;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+
+    pointer-events: none;
+    align-items: center;
+
+    button {
+      width: 70px;
+      height: 40px;
+
+      background-color: $dark-background-color;
+      color: $primary-color;
+      border: none;
+      border-radius: 5px;
+
+      font-size: 1em;
+
+      pointer-events: auto;
+      cursor: pointer;
+
+      &:hover {
+        border: 2px solid $light-background-color;
+      }
+
+      &:active {
+        background-color: $light-background-color;
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+@import "../constants";
+
+.header {
+  grid-area: a;
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+
+  background-color: lighten($dark-background-color, 10%);
+  padding-left: 20px;
+  padding-right: 20px;
+
+  a {
+    color: $primary-color;
+
+    &:not(:hover) {
+      text-decoration: none;
+    }
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

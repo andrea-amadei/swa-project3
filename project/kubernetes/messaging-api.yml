@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messaging-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: messaging-api
+  template:
+    metadata:
+      labels:
+        app: messaging-api
+    spec:
+      containers:
+        - name: messaging-api
+          image: messaging-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4000
+          resources:
+            limits:
+              cpu: 1
+          env:
+            - name: DB_FULL
+              valueFrom:
+                secretKeyRef:
+                  name: messaging-db-app
+                  key: pgpass
+                  optional: false

@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+
+  # SQL initialization script  
+  init.sql: |
+    SET TIME ZONE 'UTC';
+    CREATE TABLE user_sessions (
+        session_ID TEXT NOT NULL PRIMARY KEY,
+        creation_time TIMESTAMP NOT NULL,
+        expiration_time TIMESTAMP NOT NULL,
+        new_session BOOLEAN NOT NULL,
+        super_user BOOLEAN NOT NULL
+    );
+    CREATE TABLE threads (
+        thread_ID SERIAL NOT NULL PRIMARY KEY,
+        session_ID TEXT NOT NULL REFERENCES user_sessions(session_ID)
+            ON UPDATE CASCADE ON DELETE CASCADE,
+        "content" TEXT NOT NULL DEFAULT '',
+        creation_time TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE replies (
+        reply_ID SERIAL NOT NULL PRIMARY KEY,
+        thread_ID INTEGER NOT NULL REFERENCES threads(thread_ID)
+            ON UPDATE CASCADE ON DELETE CASCADE,
+        session_ID TEXT NOT NULL REFERENCES user_sessions(session_ID)
+            ON UPDATE CASCADE ON DELETE CASCADE,
+        "content" TEXT NOT NULL DEFAULT '',
+        creation_time TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE VIEW threads_and_replies AS
+    (
+        SELECT t.thread_ID, t.session_ID, t."content", t.creation_time, count(r.reply_id) AS "n_replies"
+        FROM threads AS t LEFT JOIN replies AS r ON t.thread_ID = r.thread_ID
+        GROUP BY t.thread_ID, t.creation_time
+        ORDER BY t.creation_time DESC
+    );
+    CREATE OR REPLACE FUNCTION _renew_or_create_user_session(old_session_id TEXT, new_user_length INTEGER) RETURNS TEXT
+    AS $$
+        DECLARE
+            new_session_id TEXT;
+            existing_rows user_sessions%ROWTYPE;
+        BEGIN
+            SELECT * FROM user_sessions INTO existing_rows WHERE session_ID = old_session_id;
+            IF existing_rows IS NOT NULL AND existing_rows.expiration_time > NOW() THEN
+                UPDATE user_sessions SET new_session = false WHERE session_ID = old_session_id;
+                IF existing_rows.expiration_time < NOW() + INTERVAL '30 day' THEN
+                    UPDATE user_sessions SET expiration_time = NOW() + INTERVAL '30 day' WHERE session_ID = old_session_id;
+                END IF;
+                RETURN existing_rows.session_ID;
+            END IF;
+            LOOP
+                new_session_id := LOWER(SUBSTRING(MD5(''||NOW()::TEXT||RANDOM()::TEXT) FOR new_user_length));
+                BEGIN
+                    INSERT INTO user_sessions (session_ID, creation_time, expiration_time, new_session, super_user)
+                        VALUES (new_session_id, NOW(), NOW() + INTERVAL '30 day', true, false);
+                    RETURN new_session_id;
+                EXCEPTION WHEN unique_violation THEN
+                END;
+            END LOOP;
+        END;
+    $$ LANGUAGE PLPGSQL;
+    CREATE OR REPLACE FUNCTION renew_user_session(old_session_id TEXT) RETURNS SETOF user_sessions
+    AS $$
+        DECLARE
+            new_session_id TEXT;
+        BEGIN
+            new_session_id := _renew_or_create_user_session(old_session_id, 32);
+            RETURN QUERY (SELECT * FROM user_sessions WHERE session_ID = new_session_id);
+        END;
+    $$ LANGUAGE PLPGSQL;
+    CREATE OR REPLACE FUNCTION add_thread(this_session_ID TEXT, this_content TEXT) RETURNS SETOF threads
+    AS $$
+        DECLARE
+            new_thread_ID INTEGER;
+        BEGIN
+            INSERT INTO threads (session_ID, "content")
+            VALUES (this_session_ID, this_content)
+            RETURNING thread_ID INTO new_thread_ID;
+            RETURN QUERY (SELECT * FROM threads WHERE thread_ID = new_thread_ID);
+        END;
+    $$ LANGUAGE PLPGSQL;
+    CREATE OR REPLACE FUNCTION add_reply(this_session_ID TEXT, this_thread_ID INTEGER, this_content TEXT) RETURNS SETOF replies
+    AS $$
+        DECLARE
+            new_reply_ID INTEGER;
+        BEGIN
+            INSERT INTO replies (thread_ID, session_ID, "content")
+            VALUES (this_thread_ID, this_session_ID, this_content)
+            RETURNING reply_ID INTO new_reply_ID;
+            RETURN QUERY (SELECT * FROM replies WHERE reply_ID = new_reply_ID);
+        END;
+    $$ LANGUAGE PLPGSQL;
+    CREATE OR REPLACE PROCEDURE clean_inactive_sessions()
+    AS $$
+        BEGIN
+            DELETE FROM user_sessions WHERE new_session = true AND (creation_time + INTERVAL '5 minutes') < NOW();
+        END;
+    $$ LANGUAGE PLPGSQL;
+    INSERT INTO user_sessions (session_ID, creation_time, expiration_time, new_session, super_user)
+    VALUES ('9ab954d06a204ab2b59462b8de886fd7', NOW(), '2100-01-01 12:00:00', false, true);
+    SELECT * FROM add_thread('9ab954d06a204ab2b59462b8de886fd7', 'Initial thread');
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public to messaging;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public to messaging;
+    GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public to messaging;
